@@ -11,19 +11,18 @@ import (
 func main() {
 	p := fmt.Println
 
-	// We'll start by getting the current time.
+	//获取当前时间
 	now := time.Now()
 	p(now)
+	//时区
+	tz, _ := time.LoadLocation("Asia/Shanghai")
 
-	// You can build a `time` struct by providing the
-	// year, month, day, etc. Times are always associated
-	// with a `Location`, i.e. time zone.
+	//构造时间
 	then := time.Date(
-		2009, 11, 17, 20, 34, 58, 651387237, time.UTC)
+		20023, 11, 17, 20, 34, 58, 651387237, tz)
 	p(then)
 
-	// You can extract the various components of the time
-	// value as expected.
+	// 时间的一些属性
 	p(then.Year())
 	p(then.Month())
 	p(then.Day())
@@ -32,32 +31,35 @@ func main() {
 	p(then.Second())
 	p(then.Nanosecond())
 	p(then.Location())
-
-	// The Monday-Sunday `Weekday` is also available.
 	p(then.Weekday())
 
-	// These methods compare two times, testing if the
-	// first occurs before, after, or at the same time
-	// as the second, respectively.
+	p("--------时间的格式化和解析--------")
+	/*
+	  go格式化字符不是用Ymd这些字符表示年月
+	  而是用特定的数值，如2006、Mon、Jan等具体值表示
+	  这些值都是固定的，不能使用其他的
+	*/
+	p(now.Format(time.RFC3339))
+	p(now.Format("06-"))
+	p(now.Format("03:04PM"))
+	p(now.Format("Mon Jan _2 15:04:05 2006"))
+	p(now.Format("2006-01-02T15:04:05.999999-07:00"))
+	form := "3 04 PM"
+	t2, _ := time.Parse(form, "8 41 PM")
+	p(t2)
+
+	// 时间比较
 	p(then.Before(now))
 	p(then.After(now))
 	p(then.Equal(now))
 
-	// The `Sub` methods returns a `Duration` representing
-	// the interval between two times.
+	// 时间运算
 	diff := now.Sub(then)
 	p(diff)
-
-	// We can compute the length of the duration in
-	// various units.
 	p(diff.Hours())
 	p(diff.Minutes())
 	p(diff.Seconds())
 	p(diff.Nanoseconds())
-
-	// You can use `Add` to advance a time by a given
-	// duration, or with a `-` to move backwards by a
-	// duration.
 	p(then.Add(diff))
 	p(then.Add(-diff))
 }
