@@ -1,49 +1,71 @@
-// In the previous example we looked at setting up a simple
-// [HTTP server](http-servers). HTTP servers are useful for
-// demonstrating the usage of `context.Context` for
-// controlling cancellation. A `Context` carries deadlines,
-// cancellation signals, and other request-scoped values
-// across API boundaries and goroutines.
 package main
 
 import (
+	"context"
 	"fmt"
-	"net/http"
+	"sync"
 	"time"
 )
 
-func hello(w http.ResponseWriter, req *http.Request) {
+func PrintWithTrace(ctx context.Context, message string) {
+	trace := ""
+	trace, _ = ctx.Value("trace").(string)
+	fmt.Printf("(Trace id %s) %s.\n", trace, message)
+}
 
-	// A `context.Context` is created for each request by
-	// the `net/http` machinery, and is available with
-	// the `Context()` method.
-	ctx := req.Context()
-	fmt.Println("server: hello handler started")
-	defer fmt.Println("server: hello handler ended")
+func WaitForCancel(ctx context.Context, name string) {
+	for range time.Tick(time.Second) {
+		select {
+		case <-ctx.Done():
+			fmt.Printf("%s quiting...\n", name)
+			return
+		default:
+			fmt.Printf("%s waiting...\n", name)
+		}
+	}
+}
 
-	// Wait for a few seconds before sending a reply to the
-	// client. This could simulate some work the server is
-	// doing. While working, keep an eye on the context's
-	// `Done()` channel for a signal that we should cancel
-	// the work and return as soon as possible.
-	select {
-	case <-time.After(10 * time.Second):
-		fmt.Fprintf(w, "hello\n")
-	case <-ctx.Done():
-		// The context's `Err()` method returns an error
-		// that explains why the `Done()` channel was
-		// closed.
-		err := ctx.Err()
-		fmt.Println("server:", err)
-		internalError := http.StatusInternalServerError
-		http.Error(w, err.Error(), internalError)
+func WithDeadline(ctx context.Context) {
+	for range time.Tick(time.Second) {
+		select {
+		case <-ctx.Done():
+			fmt.Printf("Worker timeout, %s...\n", ctx.Err())
+			return
+		default:
+			fmt.Printf("Worker is working...\n")
+		}
 	}
 }
 
 func main() {
 
-	// As before, we register our handler on the "/hello"
-	// route, and start serving.
-	http.HandleFunc("/hello", hello)
-	http.ListenAndServe(":8090", nil)
+	// 初始的context对象,其他的context对象要继承自该对象
+	ctx := context.Background()
+
+	// WithValue: 传递值
+	PrintWithTrace(context.WithValue(ctx, "trace", "0123456"), "A test message...")
+
+	// WithCancel: 可以在外部取消子程序
+	ctx2, cancelFUnc := context.WithCancel(ctx)
+	var wg sync.WaitGroup
+	wg.Add(3)
+	for i := range 3 {
+		go func() {
+			WaitForCancel(ctx2, fmt.Sprintf("worker-%d", i))
+			wg.Done()
+		}()
+	}
+	time.Sleep(time.Second * 5)
+	cancelFUnc()
+	wg.Wait()
+
+	// 带终止时间点, 子routine可以检测是否到时间, 另外一个WithTimeout类似
+	ctx3, cancelFunc2 := context.WithDeadline(ctx, time.Now().Add(time.Second*5))
+	wg.Add(1)
+	go func() {
+		WithDeadline(ctx3)
+		wg.Done()
+	}()
+	wg.Wait()
+	cancelFunc2()
 }
